@@ -129,7 +129,7 @@ def error_filtering(processed_labels,processed_predictions):
     #print("Current groomers in test: ",(current_groomers))
     
     # Remember that state-of-art methods do not take into account filtered groomers
-    real_test_groomers = 3737 # Fix number, before filtering and processing ( 3737 not because it has empty documents)
+    real_test_groomers = 3737 # Fix number, this method take into account empty documents
     filter_test_groomers = real_test_groomers - current_groomers
     
     #print("Filter groomers: ",filter_test_groomers)
