@@ -9,6 +9,7 @@ Reproducibility: for reproducibility, all codes, detailed results, parameter val
 - JSON data: To obtain the PJZ and PJZC datasets in JSON format please compile the conversations_to_json.py file. It contains the conversations in a JSON structure without the behavioral features.
 
 ## PJZ and PJZC datasets Json format
+To mitigate the shortage of data in the area of online grooming detection are assembled and studied two new datasets, which we named as PJZ and PJZC. 
 The Json format of the datasets contains the flow of the conversations in a practical format:
 - id: identifier of the conversation
 - source: Source of the conversation, i.e., PJ chats, #ZIG channel chats, Chit chat data.
