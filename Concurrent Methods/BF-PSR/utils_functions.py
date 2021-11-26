@@ -53,7 +53,37 @@ def tokenizer_Somajo_vectorizer(document):
 
 #############################################  
 
-def pre_processing_conversations(nc,documents,labels,time_bf,participants_bf,inte_user):
+def pre_processing_conversations(nc,documents,labels,time_bf,participants_bf,inte_user,keep_empty= False):
+    docs = []
+    Y = []
+    time = []
+    n_participants = []
+    n_int_user = []
+    
+    empty_docs = 0
+    index = 0
+    indexs_l = []
+    for id,conversation in (enumerate(documents)):
+        tokens_clean_conversation = nc(conversation)
+        if len (tokens_clean_conversation) == 0:
+            empty_docs += 1
+            indexs_l.append(index)
+            
+        else:
+            docs.append(tokens_clean_conversation)
+            Y.append(labels[id])
+            time.append(time_bf[id])
+            n_participants.append(participants_bf[id])
+            n_int_user.append(inte_user[id])
+        index += 1
+    if keep_empty == False:
+        return docs,Y,time,n_participants,n_int_user
+    else:
+        return indexs_l
+
+#############################################  
+
+def pre_processing_conversations_keep_empty_docs(nc,documents,labels,time_bf,participants_bf,inte_user):
     docs = []
     Y = []
     time = []
@@ -65,6 +95,11 @@ def pre_processing_conversations(nc,documents,labels,time_bf,participants_bf,int
         tokens_clean_conversation = nc(conversation)
         if len (tokens_clean_conversation) == 0:
             empty_docs += 1
+            docs.append(None)
+            Y.append(None)
+            time.append(None)
+            n_participants.append(None)
+            n_int_user.append(None)
         else:
             docs.append(tokens_clean_conversation)
             Y.append(labels[id])
@@ -73,7 +108,7 @@ def pre_processing_conversations(nc,documents,labels,time_bf,participants_bf,int
             n_int_user.append(inte_user[id])
     return docs,Y,time,n_participants,n_int_user
 
-#############################################  
+############################################# 
 
 def calculating_vocabulary(doc_train):
     # Fundamental modification to the PSR method
@@ -513,7 +548,7 @@ def obtain_text(colum):
 
 ############################################# 
 
-def pre_processing_chunks(nc,retains,Ys_test,Xss_test_time):
+def pre_processing_chunks(nc,retains,Ys_test,Xss_test_time,keep_empty=False):
     interaction_words_bf = loading_pkl('dataBase/test_early_interaction_words_user.pkl') 
     number_participants_bf = loading_pkl('dataBase/participants_matrix.pkl')#loading_pkl('dataBase/test_early_number_participants.pkl') 
     text_percentages_text = loading_pkl('dataBase/test_early_text.pkl')
@@ -530,13 +565,22 @@ def pre_processing_chunks(nc,retains,Ys_test,Xss_test_time):
         print(Xss_test.shape," ",Xss_test_participants.shape," ",Xss_test_int_user.shape)
 
         # Processing the set of documents
-        doc_partial,Y_partial,X_test_time_partial,X_test_participants_partial,X_test_int_user_partial = pre_processing_conversations(nc,Xss_test,Ys_test,Xss_test_time,Xss_test_participants,Xss_test_int_user)
-        print("Test Documents, There are :",len(doc_partial)," ",len(Y_partial))
-        Y_partial = np.asarray(Y_partial)
-        print('\033[94m')
+        if keep_empty == False:
+            doc_partial,Y_partial,X_test_time_partial,X_test_participants_partial,X_test_int_user_partial = pre_processing_conversations(nc,Xss_test,Ys_test,Xss_test_time,Xss_test_participants,Xss_test_int_user)
+            print("Test Documents, There are :",len(doc_partial)," ",len(Y_partial))
+            Y_partial = np.asarray(Y_partial)
+            print('\033[94m')
+            chunk_info = [doc_partial,Y_partial,X_test_time_partial,X_test_participants_partial,X_test_int_user_partial]
+            saving_pkl(chunk_info,"Pre_pro_chunks/chunk_preprocessed_"+str(percentage))
         
-        chunk_info = [doc_partial,Y_partial,X_test_time_partial,X_test_participants_partial,X_test_int_user_partial]
-        saving_pkl(chunk_info,"Pre_pro_chunks/chunk_preprocessed_"+str(percentage))
+        else:
+            doc_partial,Y_partial,X_test_time_partial,X_test_participants_partial,X_test_int_user_partial = pre_processing_conversations_keep_empty_docs(nc,Xss_test,Ys_test,Xss_test_time,Xss_test_participants,Xss_test_int_user)
+            print("Test Documents, There are :",len(doc_partial)," ",len(Y_partial))
+            Y_partial = np.asarray(Y_partial)
+            print('\033[94m')
+
+            chunk_info = [doc_partial,Y_partial,X_test_time_partial,X_test_participants_partial,X_test_int_user_partial]
+            saving_pkl(chunk_info,"Keep_empty_chunks/empty_chunk_preprocessed_"+str(percentage))
         
         percentage += 1
         
@@ -579,3 +623,60 @@ def plotting_bf_psr(bf_psr):
     plt.show()
 
 ############################################# 
+
+'''Adding new functions for the PJZ and PJZC datasets ...'''
+
+def error_filtering_PJdataset(processed_labels,processed_predictions):
+    print("Calculating error ...")
+    # In this function we take all groomers removed by the preprocessing as Missclassified groomers.
+    
+    # Current groomers in test set: after filtering (0 loss, add manualy) and processing (x loss)
+    current_groomers  = len(np.argwhere(processed_labels==1))
+    print("Current groomers in test: ",(current_groomers))
+    
+    # Remember that state-of-art methods do not take into account filtered groomers
+    real_test_groomers = 1104 # Fix number, in PJZ and PJZC are 1104 groomers :)
+    filter_test_groomers = real_test_groomers - current_groomers
+    
+    print("Filter groomers: ",filter_test_groomers)
+    #print("Including them into the confusion matrix as False Negatives ...")
+    
+    y = processed_labels
+    new_predictions = processed_predictions
+    # adding to true labels, groomers as 1's
+    discard_groomers = np.ones(filter_test_groomers) 
+    y = np.hstack((y,discard_groomers)) # We now add those discard groomers in the preprocessed labels
+    false_negatives = np.zeros(filter_test_groomers)
+    new_predictions = np.hstack((new_predictions,false_negatives)) # We add them as if we classify them wrontly (as 0's)
+    assert(y.shape==new_predictions.shape)
+    
+    real_f1 = np.round(f1_score(y,new_predictions,average='binary',pos_label=1),4)
+    return real_f1
+
+
+def pre_processing_conversations_new_datasets(nc,documents,time_bf,participants_bf,inte_user,labels=[],_predict=False):
+    docs = []
+    time = []
+    n_participants = []
+    n_int_user = []
+    n_labels = []
+    
+    empty_docs = 0
+    for id in range(len(documents)):
+        tokens_clean_conversation = nc(documents[id])
+        if len (tokens_clean_conversation) == 0:
+            empty_docs += 1
+        else:
+            docs.append(tokens_clean_conversation)
+            time.append(time_bf[id])
+            n_participants.append(participants_bf[id])
+            n_int_user.append(inte_user[id])
+            if _predict:
+                n_labels.append(labels[id])
+            
+            
+    if _predict:
+        return docs,time,n_participants,n_int_user,n_labels
+    else:
+        return docs,time,n_participants,n_int_user
+    
